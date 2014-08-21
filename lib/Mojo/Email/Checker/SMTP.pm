@@ -74,7 +74,7 @@ sub _connect {
 			my $err = pop;
 
 			if (@$domains) {
-				return $self->_connect($domains, $cb);
+				$self->_connect($domains, $cb);
 			} else {
 				$cb->(undef, '[ERROR] Cannot connect to anything');
 			}
