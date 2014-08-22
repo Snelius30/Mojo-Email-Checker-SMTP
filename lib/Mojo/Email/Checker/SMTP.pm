@@ -165,7 +165,7 @@ sub _check_errors {
 	if ($err) {
 		die $err;
 	} elsif ($buffer && $buffer =~ /^5/) {
-		die ($rcpt ? '' : 'Reject before RCPT ') . $buffer;
+		die $rcpt ? $buffer : 'Reject before RCPT ' . $buffer;
 	}
 }
 
