@@ -144,6 +144,7 @@ sub _readhooks {
 			$stream->unsubscribe('error');
 			$stream->unsubscribe('timeout');
 			$stream->unsubscribe('read');
+			$stream->unsubscribe('close');
 			$cb->($stream, $buffer);
 		}
 	});
@@ -155,6 +156,9 @@ sub _readhooks {
 		my $err = pop;
 		$stream->close;
 		$cb->(undef, undef, "[ERROR] $err");
+	});
+	$stream->on(close => sub {
+		$cb->(undef, undef, "[ERROR] socket closed unexpectedly by remote side");
 	});
 
 	$stream->start;
