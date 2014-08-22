@@ -6,6 +6,7 @@ use Mojo::IOLoop::Delay;
 use Mojo::IOLoop::Client;
 use Mojo::IOLoop::Stream;
 
+our $VERSION = "0.01";
 use constant CRLF => "\015\012";
 
 sub new {
@@ -38,6 +39,7 @@ sub _nslookup {
 			$result[0] = $domain unless (@result);
 		} elsif ($type eq 'A') {
 			push @result, $_->address for ($packet->answer);
+			return $cb->(undef, "[ERROR] Can't resolve $domain") unless (@result);
 		}
 		$cb->(\@result);
 	});
@@ -181,3 +183,46 @@ sub check {
 }
 
 1;
+
+__END__
+
+=pod
+
+=head1 NAME
+
+Mojo::Email::Checker::SMTP - Email checking by smtp with Mojo enviroment.
+
+=head1 SYNOPSIS
+
+    use strict;
+    use Mojolicious::Lite;
+    use Mojo::IOLoop::Delay;
+    use Mojo::Email::Checker::SMTP;
+
+    my $checker     = Mojo::Email::Checker::SMTP->new;
+
+    post '/' => sub {
+        my $self    = shift;
+        my $request = $self->req->json;
+
+        my @emails;
+        my $delay = Mojo::IOLoop::Delay->new;
+        $delay->on(finish => sub {
+                $self->render(json => \@emails);
+        });
+
+        for (@{$request}) {
+            my $cb = $delay->begin(0);
+            $checker->check($_, sub { push @emails, $_[0] if ($_[0]); $cb->(); });
+        }
+
+    };
+
+    app->start;
+
+=head1 DESCRIPTION
+
+Check for email existence by emulation smtp session to mail server (mx or direct domain, cycling for multiple ip)
+and get response.
+
+=cut
