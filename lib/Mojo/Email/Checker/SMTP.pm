@@ -32,7 +32,7 @@ sub _nslookup {
 		my $packet = $self->{resolver}->bgread($sock);
 		$self->{reactor}->remove($sock);
 		unless ($packet) { 
-			return $cb->(undef, "[ERROR] DNS resolver error: $self->{resolver}->errorstring"); 
+			return $cb->(undef, "[ERROR] DNS resolver error: " . $self->{resolver}->errorstring); 
 		}
 		if ($type eq 'MX') {
 			push @result, $_->exchange for ($packet->answer);
@@ -115,11 +115,11 @@ sub _readhooks {
 }
 
 sub _check_errors {
-	my ($self, $err, $buffer) = @_;
+	my ($self, $err, $buffer, $rcpt) = @_;
 	if ($err) {
 		die $err;
 	} elsif ($buffer && $buffer =~ /^5/) {
-		die $buffer;
+		die ($rcpt ? 'Reject before RCPT' : '') . $buffer;
 	}
 }
 
@@ -167,7 +167,7 @@ sub check {
 		},
 		sub {
 			my ($delay, $stream, $buf, $err) = @_;
-			$self->_check_errors($err, $buf);
+			$self->_check_errors($err, $buf, 1);
 			$self->_readhooks($stream, $delay->begin(0));
 			$stream->write("QUIT" . CRLF);
 		},
@@ -178,7 +178,11 @@ sub check {
 		}
 	)->catch(sub {
 			my ($delay, $err) = @_;
-			$cb->(undef, $err);
+			my $param = undef;
+			if ($err =~ /^Reject before RCPT/) {
+				$param = $email;
+			}
+			$cb->($param, $err);
 	});
 }
 
@@ -247,7 +251,7 @@ HELO value for smtp session ("ya.ru" :) is default). Use your own domain name fo
 
 =back
 
-=head2 check(STR, CALLBACK)
+=head2 check(STR, CALLBACK(EMAIL, ERROR))
 
 Main function for checking.
 
@@ -259,8 +263,9 @@ String with email address ("foo@foobox.foo")
 
 =item CALLBACK
 
-Reference to callback function (see SYNOPSIS for example). Pass to CALLBACK two parameters, 1. valid email (STR), 2. error message (STR). 
-If present, then email parameter is undefined, otherwise error parameter is undefined.
+Reference to callback function (see SYNOPSIS for example). Pass to CALLBACK two parameters, 1. valid (see comment) EMAIL (STR), 2. ERROR (STR) message. 
+
+B<Comment:> If EMAIL and ERROR is defined, it's mean that reject from smtp server recieved before RCPT command. In other cases only one parameter is defined.
 
 =back
 
