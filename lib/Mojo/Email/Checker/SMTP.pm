@@ -194,35 +194,80 @@ Mojo::Email::Checker::SMTP - Email checking by smtp with Mojo enviroment.
 
 =head1 SYNOPSIS
 
-    use strict;
-    use Mojolicious::Lite;
-    use Mojo::IOLoop::Delay;
-    use Mojo::Email::Checker::SMTP;
+	use strict;
+	use Mojolicious::Lite;
+	use Mojo::IOLoop::Delay;
+	use Mojo::Email::Checker::SMTP;
 
-    my $checker     = Mojo::Email::Checker::SMTP->new;
+	my $checker     = Mojo::Email::Checker::SMTP->new;
 
-    post '/' => sub {
-        my $self    = shift;
-        my $request = $self->req->json;
+	post '/' => sub {
+		my $self    = shift;
+		my $request = $self->req->json;
 
-        my @emails;
-        my $delay = Mojo::IOLoop::Delay->new;
-        $delay->on(finish => sub {
-                $self->render(json => \@emails);
-        });
+		my @emails;
+		my $delay = Mojo::IOLoop::Delay->new;
+		$delay->on(finish => sub {
+				$self->render(json => \@emails);
+		});
 
-        for (@{$request}) {
-            my $cb = $delay->begin(0);
-            $checker->check($_, sub { push @emails, $_[0] if ($_[0]); $cb->(); });
-        }
+		my $cb = $delay->begin();
 
-    };
+		for (@{$request}) {
+			my $cb = $delay->begin(0);
+			$checker->check($_, sub { push @emails, $_[0] if ($_[0]); $cb->(); });
+		}
 
-    app->start;
+		$cb->();
+
+	};
+
+	app->start;
 
 =head1 DESCRIPTION
 
 Check for email existence by emulation smtp session to mail server (mx or direct domain, cycling for multiple ip)
 and get response.
+
+=head1 METHODS
+
+=head2 new
+
+This is Checker object constructor. Available parameters are:
+
+=over
+
+=item timeout
+
+Timeout (seconds) for all I/O operations like to connect, wait for server response and NS Lookup. (15 sec. is default).
+
+=item helo
+
+HELO value for smtp session ("ya.ru" :) is default)
+
+=back
+
+=head2 check(STR, CALLBACK)
+
+Main function for checking.
+
+=over
+
+=item STR 
+
+String with email address ("foo@foobox.foo")
+
+=item CALLBACK
+
+Ref. to callback function (see SYNOPSIS for example)
+
+=back
+
+=head1 COPYRIGHT
+ 
+ Copyright Anatoly Y. <snelius@cpan.org>.
+  
+  This library is free software; you can redistribute it and/or
+  modify it under the same terms as Perl itself.
 
 =cut
