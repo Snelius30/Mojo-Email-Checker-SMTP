@@ -1,3 +1,40 @@
+package Mojo::Email::Checker::SMTP::Cache;
+
+use strict;
+use Mojo::IOLoop;
+
+sub new {
+	my ($class, %opts) = @_;
+	my $self = { cache => {}, cache_index => [], timeout => $opts{timeout} };
+
+	Mojo::IOLoop->recurring($self->{timeout} => sub {
+		my $time = time;
+		my $i	 = 0;
+		for my $domain (@{$self->{cache_index}}) {
+			if (time() - $self->{A}{$domain}{time} < $self->{timeout}) {
+				delete $self->{A}{$domain};
+				delete $self->{MX}{$domain};
+				++$i;
+			}
+		}
+		splice(@$self->{cache_index}, 0, $i);
+	});
+	bless $self, $class;
+}
+
+sub add {
+	my ($self, $domain, $type, $value) = @_;
+	$self->{$type}{$domain}{values} = $value; #ref to array
+	$self->{$type}{$domain}{time}   = time;
+	push @$self->{cache_index}, $domain;
+}
+
+sub get {
+	my ($self, $domain, $type) = @_;
+	return $self->{$type}{$domain}{values};
+}
+
+
 package Mojo::Email::Checker::SMTP;
 
 use strict;
@@ -15,7 +52,8 @@ sub new {
 			resolver	=> Net::DNS::Resolver->new,
 			reactor		=> Mojo::IOLoop->singleton->reactor,
 			timeout		=> ($opts{timeout} ? $opts{timeout} : 15),
-			helo		=> ($opts{helo} ? $opts{helo} : 'ya.ru')
+			helo		=> ($opts{helo} ? $opts{helo} : 'ya.ru'),
+			cache		=> ($opts{cache} ? Mojo::Email::Checker::SMTP::Cache->new(timeout => $opts{cache}) : 0)
 		  }, $class;
 }
 
