@@ -227,7 +227,7 @@ Mojo::Email::Checker::SMTP - Email checking by smtp with Mojo enviroment.
 =head1 DESCRIPTION
 
 Check for email existence by emulation smtp session to mail server (mx or direct domain, cycling for multiple ip)
-and get response.
+and get response. Mechanism description L<http://en.wikipedia.org/wiki/Callback_verification>
 
 =head1 METHODS
 
@@ -243,7 +243,7 @@ Timeout (seconds) for all I/O operations like to connect, wait for server respon
 
 =item helo
 
-HELO value for smtp session ("ya.ru" :) is default)
+HELO value for smtp session ("ya.ru" :) is default). Use your own domain name for this value.
 
 =back
 
@@ -259,7 +259,8 @@ String with email address ("foo@foobox.foo")
 
 =item CALLBACK
 
-Ref. to callback function (see SYNOPSIS for example)
+Reference to callback function (see SYNOPSIS for example). Pass to CALLBACK two parameters, 1. valid email (STR), 2. error message (STR). 
+If present, then email parameter is undefined, otherwise error parameter is undefined.
 
 =back
 
