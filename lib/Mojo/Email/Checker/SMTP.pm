@@ -132,32 +132,40 @@ sub _connect {
 	});
 }
 
+sub _unsubscribe {
+	my ($self, $stream) = @_;
+	
+	$stream->unsubscribe('error');
+	$stream->unsubscribe('timeout');
+	$stream->unsubscribe('read');
+	$stream->unsubscribe('close');
+}
+
 sub _readhooks {
 	my ($self, $stream, $cb) = @_;
-
+	
 	my $buffer;
 	$stream->timeout($self->{timeout});
 	$stream->on(read => sub {
 		my $bytes = pop;
 		$buffer  .= $bytes;
+		
 		if ($bytes =~ /\n$/) {
-			$stream->unsubscribe('error');
-			$stream->unsubscribe('timeout');
-			$stream->unsubscribe('read');
-			$stream->unsubscribe('close');
+			$self->_unsubscribe($stream);
 			$cb->($stream, $buffer);
 		}
 	});
 	$stream->on(timeout => sub {
-		$stream->close;
+		$self->_unsubscribe($stream);
 		$cb->(undef, undef, '[ERROR] Timeout');
 	});
 	$stream->on(error => sub {
 		my $err = pop;
-		$stream->close;
+		$self->_unsubscribe($stream);
 		$cb->(undef, undef, "[ERROR] $err");
 	});
 	$stream->on(close => sub {
+		$self->_unsubscribe($stream);
 		$cb->(undef, undef, "[ERROR] socket closed unexpectedly by remote side");
 	});
 
