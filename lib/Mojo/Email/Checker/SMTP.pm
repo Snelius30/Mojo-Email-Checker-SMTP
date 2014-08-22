@@ -31,7 +31,7 @@ sub _nslookup {
 		my $packet = $self->{resolver}->bgread($sock);
 		$self->{reactor}->remove($sock);
 		unless ($packet) { 
-			$cb->(undef, "[ERROR] DNS resolver error: $self->{resolver}->errorstring"); 
+			return $cb->(undef, "[ERROR] DNS resolver error: $self->{resolver}->errorstring"); 
 		}
 		if ($type eq 'MX') {
 			push @result, $_->exchange for ($packet->answer);
@@ -52,9 +52,18 @@ sub _connect {
 	my $client = Mojo::IOLoop::Client->new();
 
 	$self->_nslookup($addr, 'A', sub {
-		my $addr = shift;
-		my $ip   = shift @$addr if (@$addr);
-		$client->connect(address => $ip, port => 25, timeout => $self->{timeout});
+		my ($ips, $err) = @_;
+		
+		unless ($ips) {
+			if (@$domains) {
+				return $self->_connect($domains, $cb);
+			}
+			else {
+				return $cb->(undef, $err);
+			}
+		}
+		
+		$client->connect(address => $ips->[0], port => 25, timeout => $self->{timeout});
 		$client->on(connect => sub {
 			my $handle = pop;
 			$cb->($handle);
