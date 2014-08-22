@@ -73,10 +73,18 @@ sub _nslookup {
 			return $cb->(undef, "[ERROR] DNS resolver error: " . $self->{resolver}->errorstring); 
 		}
 		if ($type eq 'MX') {
-			push @result, $_->exchange for ($packet->answer);
+			for my $rec ($packet->answer) {
+				if ($rec->type eq $type) {
+					push @result, $rec->exchange;
+				}
+			}
 			$result[0] = $domain unless (@result);
 		} elsif ($type eq 'A') {
-			push @result, $_->address for ($packet->answer);
+			for my $rec ($packet->answer) {
+				if ($rec->type eq $type) {
+					push @result, $rec->address;
+				}
+			}
 			return $cb->(undef, "[ERROR] Can't resolve $domain") unless (@result);
 		}
 		$cb->(\@result);
