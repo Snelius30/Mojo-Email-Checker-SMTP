@@ -119,7 +119,7 @@ sub _check_errors {
 	if ($err) {
 		die $err;
 	} elsif ($buffer && $buffer =~ /^5/) {
-		die ($rcpt ? '' : 'Reject before RCPT') . $buffer;
+		die ($rcpt ? '' : 'Reject before RCPT ') . $buffer;
 	}
 }
 
@@ -182,7 +182,6 @@ sub check {
 			if ($err =~ /^Reject before RCPT/) {
 				$param = $email;
 			}
-			print "Die with ERR: $err\nemail is $email\n";
 			$cb->($param, $err);
 	});
 }
