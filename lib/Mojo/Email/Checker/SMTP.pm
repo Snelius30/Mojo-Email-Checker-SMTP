@@ -16,7 +16,7 @@ sub new {
 				++$i;
 				next;
 			}
-			if ($time - $self->{cache}{A}{$domain}{time} < $self->{timeout}) {
+			if ($time - $self->{cache}{A}{$domain}{time} > $self->{timeout}) {
 				delete $self->{cache}{A}{$domain};
 				delete $self->{cache}{MX}{$domain} if (exists($self->{cache}{MX}{$domain}));
 				++$i;
@@ -31,16 +31,19 @@ sub new {
 }
 
 sub add {
-	my ($self, $domain, $type, @value) = @_;
-	$self->{cache}{$type}{$domain}{values} = \@value;
+	my ($self, $domain, $type, $value, $error) = @_;
+	$self->{cache}{$type}{$domain}{values} = [ @$value ]; #ref to array
 	$self->{cache}{$type}{$domain}{time}   = steady_time();
+	$self->{cache}{$type}{$domain}{error}  = $error;
+
 	push @{$self->{cache_index}}, $domain;
 }
 
 sub get {
 	my ($self, $domain, $type) = @_;
 
-	return ($self->{cache}{$type}{$domain} ? @{$self->{cache}{$type}{$domain}{values}} : ());
+	return ($self->{cache}{$type}{$domain} ? { values => [ @{$self->{cache}{$type}{$domain}{values}} ], 
+			error => $self->{cache}{$type}{$domain}{error} } : undef);
 }
 
 
@@ -71,8 +74,12 @@ sub _nslookup {
 	my @result;
 
 	if ($self->{cache}) {
-		@result = $self->{cache}->get($domain, $type);
-		return $cb->(\@result) if (@result);
+		my $result = $self->{cache}->get($domain, $type);
+		if ($result && !$result->{error}) {
+			return $cb->($result->{values});
+		} elsif ($result->{error}) {
+			return $cb->(undef, $result->{error});
+		}
 	}
 
 	my $sock	 = $self->{resolver}->bgsend($domain, $type);
@@ -101,11 +108,11 @@ sub _nslookup {
 				}
 			}
 			unless (@result) {
-				$self->{cache}->add($domain, $type, ('-1')) if ($self->{cache});
+				$self->{cache}->add($domain, $type, undef, "[ERROR] Can't resolve $domain") if ($self->{cache});
 				return $cb->(undef, "[ERROR] Can't resolve $domain");
 			}
 		}
-		$self->{cache}->add($domain, $type, @result) if ($self->{cache});
+		$self->{cache}->add($domain, $type, \@result) if ($self->{cache});
 		$cb->(\@result);
 	});
 	$self->{reactor}->watch($sock, 1, 0);
@@ -118,7 +125,6 @@ sub _connect {
 	my $addr   = shift @$domains if (@$domains);
 	my $client = Mojo::IOLoop::Client->new();
 
-	return $cb->(undef, 'NXDOMAIN or noip object from cache') if ($addr eq '-1'); #NXDOMAIN or NoIPS (only for cached records)
 	$self->_nslookup($addr, 'A', sub {
 		my ($ips, $err) = @_;
 		
