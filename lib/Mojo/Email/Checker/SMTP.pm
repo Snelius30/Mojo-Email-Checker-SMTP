@@ -73,10 +73,18 @@ sub _nslookup {
 			return $cb->(undef, "[ERROR] DNS resolver error: " . $self->{resolver}->errorstring); 
 		}
 		if ($type eq 'MX') {
-			push @result, $_->exchange for ($packet->answer);
+			for my $rec ($packet->answer) {
+				if ($rec->type eq $type) {
+					push @result, $rec->exchange;
+				}
+			}
 			$result[0] = $domain unless (@result);
 		} elsif ($type eq 'A') {
-			push @result, $_->address for ($packet->answer);
+			for my $rec ($packet->answer) {
+				if ($rec->type eq $type) {
+					push @result, $rec->address;
+				}
+			}
 			return $cb->(undef, "[ERROR] Can't resolve $domain") unless (@result);
 		}
 		$cb->(\@result);
@@ -124,29 +132,41 @@ sub _connect {
 	});
 }
 
+sub _unsubscribe {
+	my ($self, $stream) = @_;
+	
+	$stream->unsubscribe('error');
+	$stream->unsubscribe('timeout');
+	$stream->unsubscribe('read');
+	$stream->unsubscribe('close');
+}
+
 sub _readhooks {
 	my ($self, $stream, $cb) = @_;
-
+	
 	my $buffer;
 	$stream->timeout($self->{timeout});
 	$stream->on(read => sub {
 		my $bytes = pop;
 		$buffer  .= $bytes;
+		
 		if ($bytes =~ /\n$/) {
-			$stream->unsubscribe('error');
-			$stream->unsubscribe('timeout');
-			$stream->unsubscribe('read');
+			$self->_unsubscribe($stream);
 			$cb->($stream, $buffer);
 		}
 	});
 	$stream->on(timeout => sub {
-		$stream->close;
+		$self->_unsubscribe($stream);
 		$cb->(undef, undef, '[ERROR] Timeout');
 	});
 	$stream->on(error => sub {
 		my $err = pop;
-		$stream->close;
+		$self->_unsubscribe($stream);
 		$cb->(undef, undef, "[ERROR] $err");
+	});
+	$stream->on(close => sub {
+		$self->_unsubscribe($stream);
+		$cb->(undef, undef, "[ERROR] socket closed unexpectedly by remote side");
 	});
 
 	$stream->start;
@@ -157,7 +177,7 @@ sub _check_errors {
 	if ($err) {
 		die $err;
 	} elsif ($buffer && $buffer =~ /^5/) {
-		die ($rcpt ? '' : 'Reject before RCPT ') . $buffer;
+		die $rcpt ? $buffer : 'Reject before RCPT ' . $buffer;
 	}
 }
 
