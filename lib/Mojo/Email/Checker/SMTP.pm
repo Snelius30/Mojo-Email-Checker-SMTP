@@ -2,36 +2,45 @@ package Mojo::Email::Checker::SMTP::Cache;
 
 use strict;
 use Mojo::IOLoop;
+use Mojo::Util qw/steady_time/;
 
 sub new {
 	my ($class, %opts) = @_;
 	my $self = { cache => {}, cache_index => [], timeout => $opts{timeout} };
 
 	Mojo::IOLoop->recurring($self->{timeout} => sub {
-		my $time = time;
+		my $time = steady_time();
 		my $i	 = 0;
 		for my $domain (@{$self->{cache_index}}) {
-			if (time() - $self->{A}{$domain}{time} < $self->{timeout}) {
-				delete $self->{A}{$domain};
-				delete $self->{MX}{$domain};
+			unless (exists($self->{cache}{A}{$domain})) {
 				++$i;
+				next;
+			}
+			if ($time - $self->{cache}{A}{$domain}{time} < $self->{timeout}) {
+				delete $self->{cache}{A}{$domain};
+				delete $self->{cache}{MX}{$domain} if (exists($self->{cache}{MX}{$domain}));
+				++$i;
+			} else {
+				last;
 			}
 		}
-		splice(@$self->{cache_index}, 0, $i);
+		splice(@{$self->{cache_index}}, 0, $i);
 	});
+
 	bless $self, $class;
 }
 
 sub add {
-	my ($self, $domain, $type, $value) = @_;
-	$self->{$type}{$domain}{values} = $value; #ref to array
-	$self->{$type}{$domain}{time}   = time;
-	push @$self->{cache_index}, $domain;
+	my ($self, $domain, $type, @value) = @_;
+	$self->{cache}{$type}{$domain}{values} = \@value;
+	$self->{cache}{$type}{$domain}{time}   = steady_time();
+	push @{$self->{cache_index}}, $domain;
 }
 
 sub get {
 	my ($self, $domain, $type) = @_;
-	return $self->{$type}{$domain}{values};
+
+	return ($self->{cache}{$type}{$domain} ? @{$self->{cache}{$type}{$domain}{values}} : ());
 }
 
 
@@ -43,7 +52,7 @@ use Mojo::IOLoop::Delay;
 use Mojo::IOLoop::Client;
 use Mojo::IOLoop::Stream;
 
-our $VERSION = "0.01";
+our $VERSION = "0.02";
 use constant CRLF => "\015\012";
 
 sub new {
@@ -60,6 +69,12 @@ sub new {
 sub _nslookup {
 	my ($self, $domain, $type, $cb) = @_;
 	my @result;
+
+	if ($self->{cache}) {
+		@result = $self->{cache}->get($domain, $type);
+		return $cb->(\@result) if (@result);
+	}
+
 	my $sock	 = $self->{resolver}->bgsend($domain, $type);
 	my $timer_id = $self->{reactor}->timer($self->{timeout} => sub {
 		$self->{reactor}->remove($sock);
@@ -85,8 +100,12 @@ sub _nslookup {
 					push @result, $rec->address;
 				}
 			}
-			return $cb->(undef, "[ERROR] Can't resolve $domain") unless (@result);
+			unless (@result) {
+				$self->{cache}->add($domain, $type, ('-1')) if ($self->{cache});
+				return $cb->(undef, "[ERROR] Can't resolve $domain");
+			}
 		}
+		$self->{cache}->add($domain, $type, @result) if ($self->{cache});
 		$cb->(\@result);
 	});
 	$self->{reactor}->watch($sock, 1, 0);
@@ -99,6 +118,7 @@ sub _connect {
 	my $addr   = shift @$domains if (@$domains);
 	my $client = Mojo::IOLoop::Client->new();
 
+	return $cb->(undef, 'NXDOMAIN or noip object from cache') if ($addr eq '-1'); #NXDOMAIN or NoIPS (only for cached records)
 	$self->_nslookup($addr, 'A', sub {
 		my ($ips, $err) = @_;
 		
@@ -306,6 +326,11 @@ Timeout (seconds) for all I/O operations like to connect, wait for server respon
 =item helo
 
 HELO value for smtp session ("ya.ru" :) is default). Use your own domain name for this value.
+
+=item cache
+
+Enable caching for nslookup operation. In value, cache records timeout (in seconds). For example (cache => 3600) for one hour.
+Cache disabled if 0 value or undefined.
 
 =back
 
