@@ -42,7 +42,7 @@ sub add {
 sub get {
 	my ($self, $domain, $type) = @_;
 
-	return ($self->{cache}{$type}{$domain} ? ([ @{$self->{cache}{$type}{$domain}{values}} ], $self->{cache}{$type}{$domain}{error} ) : ());
+	return ($self->{cache}{$type}{$domain} ? (eval { [ @{$self->{cache}{$type}{$domain}{values}} ] }, $self->{cache}{$type}{$domain}{error}) : ());
 }
 
 sub DESTROY {
