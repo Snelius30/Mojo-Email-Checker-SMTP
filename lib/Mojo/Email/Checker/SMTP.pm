@@ -17,12 +17,10 @@ sub new {
 							for my $type (keys %{$this->{cache_index}}) {
 								my $i = 0;
 								for my $domain (@{$this->{cache_index}{$type}}) {
-									if (exists($this->{cache}{$type}{$domain})) {
-										if (($time - $this->{cache}{$type}{$domain}{time}) > $this->{timeout}) {
-											delete $this->{cache}{$type}{$domain};
-										} else {
-											last;
-										}
+									if (($time - $this->{cache}{$type}{$domain}{time}) > $this->{timeout}) {
+										delete $this->{cache}{$type}{$domain};
+									} else {
+										last;
 									}
 									++$i;
 								}
@@ -35,11 +33,12 @@ sub new {
 
 sub add {
 	my ($self, $domain, $type, $value, $error) = @_;
-	$self->{cache}{$type}{$domain}{values} = $value; #ref to array
-	$self->{cache}{$type}{$domain}{time}   = steady_time();
-	$self->{cache}{$type}{$domain}{error}  = $error;
-
-	push @{$self->{cache_index}{$type}}, $domain;
+	unless (exists($self->{cache}{$type}{$domain})) {
+		$self->{cache}{$type}{$domain}{values} = $value; #ref to array
+		$self->{cache}{$type}{$domain}{time}   = steady_time();
+		$self->{cache}{$type}{$domain}{error}  = $error;
+		push @{$self->{cache_index}{$type}}, $domain;
+	}
 }
 
 sub get {
