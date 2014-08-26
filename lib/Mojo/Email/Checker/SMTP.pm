@@ -7,14 +7,14 @@ use Scalar::Util qw/weaken/;
 
 sub new {
 	my ($class, %opts) = @_;
-	my $self = { cache => {}, cache_index => {A => [], MX => []}, timeout => $opts{timeout} };
+	my $self = { cache => {}, cache_index => {}, timeout => $opts{timeout} };
 
 	my $this = $self;
 	weaken $this;
 
 	$self->{timer_id} = Mojo::IOLoop->recurring($this->{timeout} => sub {
 							my $time = steady_time();
-							for my $type (keys $this->{cache_index}) {
+							for my $type (keys %{$this->{cache_index}}) {
 								my $i = 0;
 								for my $domain (@{$this->{cache_index}{$type}}) {
 									if (exists($this->{cache}{$type}{$domain})) {
