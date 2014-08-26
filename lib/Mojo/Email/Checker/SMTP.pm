@@ -3,28 +3,32 @@ package Mojo::Email::Checker::SMTP::Cache;
 use strict;
 use Mojo::IOLoop;
 use Mojo::Util qw/steady_time/;
+use Scalar::Util qw/weaken/;
 
 sub new {
 	my ($class, %opts) = @_;
 	my $self = { cache => {}, cache_index => [], timeout => $opts{timeout} };
 
-	$self->{timer_id} = Mojo::IOLoop->recurring($self->{timeout} => sub {
+	my $this = $self;
+	weaken $this;
+
+	$self->{timer_id} = Mojo::IOLoop->recurring($this->{timeout} => sub {
 							my $time = steady_time();
 							my $i	 = 0;
-							for my $domain (@{$self->{cache_index}}) {
-								unless (exists($self->{cache}{A}{$domain})) {
+							for my $domain (@{$this->{cache_index}}) {
+								unless (exists($this->{cache}{A}{$domain})) {
 									++$i;
 									next;
 								}
-								if ($time - $self->{cache}{A}{$domain}{time} > $self->{timeout}) {
-									delete $self->{cache}{A}{$domain};
-									delete $self->{cache}{MX}{$domain} if (exists($self->{cache}{MX}{$domain}));
+								if ($time - $this->{cache}{A}{$domain}{time} > $this->{timeout}) {
+									delete $this->{cache}{A}{$domain};
+									delete $this->{cache}{MX}{$domain} if (exists($this->{cache}{MX}{$domain}));
 									++$i;
 								} else {
 									last;
 								}
 							}
-							splice(@{$self->{cache_index}}, 0, $i);
+							splice(@{$this->{cache_index}}, 0, $i);
 						});
 
 	bless $self, $class;
