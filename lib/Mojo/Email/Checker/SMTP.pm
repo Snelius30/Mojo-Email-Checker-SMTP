@@ -7,7 +7,7 @@ use Scalar::Util qw/weaken/;
 
 sub new {
 	my ($class, %opts) = @_;
-	my $self = { cache => {}, cache_index => [], timeout => $opts{timeout} };
+	my $self = { cache => {}, cache_index => {A => [], MX => []}, timeout => $opts{timeout} };
 
 	my $this = $self;
 	weaken $this;
@@ -15,20 +15,19 @@ sub new {
 	$self->{timer_id} = Mojo::IOLoop->recurring($this->{timeout} => sub {
 							my $time = steady_time();
 							my $i	 = 0;
-							for my $domain (@{$this->{cache_index}}) {
-								unless (exists($this->{cache}{A}{$domain})) {
-									++$i;
-									next;
-								}
-								if ($time - $this->{cache}{A}{$domain}{time} > $this->{timeout}) {
-									delete $this->{cache}{A}{$domain};
-									delete $this->{cache}{MX}{$domain} if (exists($this->{cache}{MX}{$domain}));
-									++$i;
-								} else {
-									last;
-								}
+							for my $domain (@{$this->{cache_index}{A}}) {
+								delete $this->{cache}{A}{$domain}
+									if (exists($this->{cache}{A}{$domain}) && ($time - $this->{cache}{A}{$domain}{time}) > $this->{timeout});
+								++$i;
 							}
-							splice(@{$this->{cache_index}}, 0, $i);
+							splice(@{$this->{cache_index}{A}}, 0, $i);
+							$i = 0;
+							for my $domain (@{$this->{cache_index}{MX}}) {
+								delete $this->{cache}{MX}{$domain}
+									if (exists($this->{cache}{MX}{$domain}) && ($time - $this->{cache}{MX}{$domain}{time}) > $this->{timeout});
+								++$i;
+							}
+							splice(@{$this->{cache_index}{MX}}, 0, $i);
 						});
 
 	bless $self, $class;
@@ -40,7 +39,7 @@ sub add {
 	$self->{cache}{$type}{$domain}{time}   = steady_time();
 	$self->{cache}{$type}{$domain}{error}  = $error;
 
-	push @{$self->{cache_index}}, $domain;
+	push @{$self->{cache_index}{$type}}, $domain;
 }
 
 sub get {
