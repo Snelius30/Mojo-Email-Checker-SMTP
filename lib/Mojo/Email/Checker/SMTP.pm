@@ -8,24 +8,24 @@ sub new {
 	my ($class, %opts) = @_;
 	my $self = { cache => {}, cache_index => [], timeout => $opts{timeout} };
 
-	Mojo::IOLoop->recurring($self->{timeout} => sub {
-		my $time = steady_time();
-		my $i	 = 0;
-		for my $domain (@{$self->{cache_index}}) {
-			unless (exists($self->{cache}{A}{$domain})) {
-				++$i;
-				next;
-			}
-			if ($time - $self->{cache}{A}{$domain}{time} > $self->{timeout}) {
-				delete $self->{cache}{A}{$domain};
-				delete $self->{cache}{MX}{$domain} if (exists($self->{cache}{MX}{$domain}));
-				++$i;
-			} else {
-				last;
-			}
-		}
-		splice(@{$self->{cache_index}}, 0, $i);
-	});
+	$self->{timer_id} = Mojo::IOLoop->recurring($self->{timeout} => sub {
+							my $time = steady_time();
+							my $i	 = 0;
+							for my $domain (@{$self->{cache_index}}) {
+								unless (exists($self->{cache}{A}{$domain})) {
+									++$i;
+									next;
+								}
+								if ($time - $self->{cache}{A}{$domain}{time} > $self->{timeout}) {
+									delete $self->{cache}{A}{$domain};
+									delete $self->{cache}{MX}{$domain} if (exists($self->{cache}{MX}{$domain}));
+									++$i;
+								} else {
+									last;
+								}
+							}
+							splice(@{$self->{cache_index}}, 0, $i);
+						});
 
 	bless $self, $class;
 }
@@ -42,8 +42,12 @@ sub add {
 sub get {
 	my ($self, $domain, $type) = @_;
 
-	return ($self->{cache}{$type}{$domain} ? { values => [ @{$self->{cache}{$type}{$domain}{values}} ], 
-			error => $self->{cache}{$type}{$domain}{error} } : undef);
+	return ($self->{cache}{$type}{$domain} ? ([ @{$self->{cache}{$type}{$domain}{values}} ], $self->{cache}{$type}{$domain}{error} ) : ());
+}
+
+sub DESTROY {
+	my $self = shift;
+	Mojo::IOLoop->remove($self->{timer_id}) if ($self->{timer_id});
 }
 
 
@@ -74,11 +78,8 @@ sub _nslookup {
 	my @result;
 
 	if ($self->{cache}) {
-		my $result = $self->{cache}->get($domain, $type);
-		if ($result && !$result->{error}) {
-			return $cb->($result->{values});
-		} elsif ($result->{error}) {
-			return $cb->(undef, $result->{error});
+		if (my ($result, $error) = $self->{cache}->get($domain, $type)) {
+			return $cb->($result, $error);
 		}
 	}
 
