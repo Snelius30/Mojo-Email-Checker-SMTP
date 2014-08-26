@@ -14,20 +14,20 @@ sub new {
 
 	$self->{timer_id} = Mojo::IOLoop->recurring($this->{timeout} => sub {
 							my $time = steady_time();
-							my $i	 = 0;
-							for my $domain (@{$this->{cache_index}{A}}) {
-								delete $this->{cache}{A}{$domain}
-									if (exists($this->{cache}{A}{$domain}) && ($time - $this->{cache}{A}{$domain}{time}) > $this->{timeout});
-								++$i;
+							for my $type (keys $this->{cache_index}) {
+								my $i = 0;
+								for my $domain (@{$this->{cache_index}{$type}}) {
+									if (exists($this->{cache}{$type}{$domain})) {
+										if (($time - $this->{cache}{$type}{$domain}{time}) > $this->{timeout}) {
+											delete $this->{cache}{$type}{$domain};
+										} else {
+											last;
+										}
+									}
+									++$i;
+								}
+								splice(@{$this->{cache_index}{$type}}, 0, $i);
 							}
-							splice(@{$this->{cache_index}{A}}, 0, $i);
-							$i = 0;
-							for my $domain (@{$this->{cache_index}{MX}}) {
-								delete $this->{cache}{MX}{$domain}
-									if (exists($this->{cache}{MX}{$domain}) && ($time - $this->{cache}{MX}{$domain}{time}) > $this->{timeout});
-								++$i;
-							}
-							splice(@{$this->{cache_index}{MX}}, 0, $i);
 						});
 
 	bless $self, $class;
