@@ -36,7 +36,7 @@ sub new {
 
 sub add {
 	my ($self, $domain, $type, $value, $error) = @_;
-	$self->{cache}{$type}{$domain}{values} = [ @$value ]; #ref to array
+	$self->{cache}{$type}{$domain}{values} = $value; #ref to array
 	$self->{cache}{$type}{$domain}{time}   = steady_time();
 	$self->{cache}{$type}{$domain}{error}  = $error;
 
@@ -46,7 +46,7 @@ sub add {
 sub get {
 	my ($self, $domain, $type) = @_;
 
-	return ($self->{cache}{$type}{$domain} ? (eval { [ @{$self->{cache}{$type}{$domain}{values}} ] }, $self->{cache}{$type}{$domain}{error}) : ());
+	return ($self->{cache}{$type}{$domain} ? ($self->{cache}{$type}{$domain}{values}, $self->{cache}{$type}{$domain}{error}) : ());
 }
 
 sub DESTROY {
@@ -125,10 +125,11 @@ sub _nslookup {
 
 
 sub _connect {
-	my ($self, $domains, $cb) = @_;
+	my ($self, $target, $cb) = @_;
 
-	my $addr   = shift @$domains if (@$domains);
-	my $client = Mojo::IOLoop::Client->new();
+	my $domains = [@{$target}];
+	my $addr    = shift @$domains if (@$domains);
+	my $client  = Mojo::IOLoop::Client->new();
 
 	$self->_nslookup($addr, 'A', sub {
 		my ($ips, $err) = @_;
