@@ -4,7 +4,7 @@ use strict;
 use Mojo::IOLoop;
 use Mojo::Util qw/steady_time/;
 use Scalar::Util qw/weaken/;
-use URI::UTF8::Punycode;
+use URI;
 use utf8;
 
 sub new {
@@ -216,22 +216,8 @@ sub _check_errors {
 sub _puny_encode_email {
 	my ($self, $email) 	= @_;
 	my ($user, $domain) = $email =~ m|(.+?)@(.+?)$|;
-	my @idn_user;
-	my @idn_domain;
-	
-	for my $u (split(/\./, $user)) {
-		$u = URI::UTF8::Punycode::puny_enc($u) if ($u =~ m|[а-я]|i);
-		push @idn_user, $u;
-	}
-	for my $d (split(/\./, $domain)) {
-		$d = URI::UTF8::Punycode::puny_enc($d) if ($d =~ m|[а-я]|i);
-		push @idn_domain, $d;
-	}
-	
-	$user 	= join('.', @idn_user);
-	$domain = join('.', @idn_domain);
 
-	return $user . '@' . $domain;
+	return URI->new("http://$user")->host . '@' . URI->new("http://$domain")->host;
 }
 
 sub check {
@@ -243,7 +229,7 @@ sub check {
 		return; 
 	}
 	
-	$domain = URI::UTF8::Punycode::puny_enc($domain) if ($domain =~ m|[а-я]|i);
+	$domain = URI->new("http://$domain")->host;
 
 	Mojo::IOLoop::Delay->new->steps(
 		sub {
