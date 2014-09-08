@@ -4,6 +4,8 @@ use strict;
 use Mojo::IOLoop;
 use Mojo::Util qw/steady_time/;
 use Scalar::Util qw/weaken/;
+use URI::UTF8::Punycode;
+use utf8;
 
 sub new {
 	my ($class, %opts) = @_;
@@ -61,7 +63,7 @@ use Mojo::IOLoop::Delay;
 use Mojo::IOLoop::Client;
 use Mojo::IOLoop::Stream;
 
-our $VERSION = "0.02";
+our $VERSION = "0.03";
 use constant CRLF => "\015\012";
 
 sub new {
@@ -211,6 +213,27 @@ sub _check_errors {
 	}
 }
 
+sub _puny_encode_email {
+	my ($self, $email) 	= @_;
+	my ($user, $domain) = $email =~ m|(.+?)@(.+?)$|;
+	my @idn_user;
+	my @idn_domain;
+	
+	for my $u (split(/\./, $user)) {
+		$u = URI::UTF8::Punycode::puny_enc($u) if ($u =~ m|[а-я]|i);
+		push @idn_user, $u;
+	}
+	for my $d (split(/\./, $domain)) {
+		$d = URI::UTF8::Punycode::puny_enc($d) if ($d =~ m|[а-я]|i);
+		push @idn_domain, $d;
+	}
+	
+	$user 	= join('.', @idn_user);
+	$domain = join('.', @idn_domain);
+
+	return $user . '@' . $domain;
+}
+
 sub check {
 	my ($self, $email, $cb) = @_;
 	my ($domain) = $email =~  m|@(.+?)$|;
@@ -219,6 +242,8 @@ sub check {
 		$cb->(undef, "[ERROR] Bad email address: $email");
 		return; 
 	}
+	
+	$domain = URI::UTF8::Punycode::puny_enc($domain) if ($domain =~ m|[а-я]|i);
 
 	Mojo::IOLoop::Delay->new->steps(
 		sub {
@@ -251,7 +276,8 @@ sub check {
 			my ($delay, $stream, $buf, $err) = @_;
 			$self->_check_errors($err, $buf);
 			$self->_readhooks($stream, $delay->begin(0));
-			$stream->write("RCPT TO: <$email>" . CRLF);
+			my $idn_email = $self->_puny_encode_email($email);
+			$stream->write("RCPT TO: <$idn_email>" . CRLF);
 		},
 		sub {
 			my ($delay, $stream, $buf, $err) = @_;
@@ -282,7 +308,7 @@ __END__
 
 =head1 NAME
 
-Mojo::Email::Checker::SMTP - Email checking by smtp with Mojo enviroment.
+Mojo::Email::Checker::SMTP - Email checking by smtp with Mojo enviroment. (IDN supported)
 
 =head1 SYNOPSIS
 

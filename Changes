@@ -1,3 +1,6 @@
+0.03 Mon Sep 8 12:22:24 NOVT 2014
+- add IDN support
+
 0.02 Mon Aug 25 17:07:39 NOVT 2014
 - add cache for nslookup operation
 
