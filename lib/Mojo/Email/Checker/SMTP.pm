@@ -5,7 +5,6 @@ use Mojo::IOLoop;
 use Mojo::Util qw/steady_time/;
 use Scalar::Util qw/weaken/;
 use URI;
-use utf8;
 
 sub new {
 	my ($class, %opts) = @_;
