@@ -4,7 +4,7 @@ use strict;
 use Mojo::IOLoop;
 use Mojo::Util qw/steady_time/;
 use Scalar::Util qw/weaken/;
-use URI;
+use Mojo::URL;
 
 sub new {
 	my ($class, %opts) = @_;
@@ -216,7 +216,7 @@ sub _puny_encode_email {
 	my ($self, $email) 	= @_;
 	my ($user, $domain) = $email =~ m|(.+?)@(.+?)$|;
 
-	return URI->new("http://$user")->host . '@' . URI->new("http://$domain")->host;
+	return Mojo::URL->new("http://$user")->ihost . '@' . Mojo::URL->new("http://$domain")->ihost;
 }
 
 sub check {
@@ -228,7 +228,7 @@ sub check {
 		return; 
 	}
 	
-	$domain = URI->new("http://$domain")->host;
+	$domain = Mojo::URL->new("http://$domain")->ihost;
 
 	Mojo::IOLoop::Delay->new->steps(
 		sub {
