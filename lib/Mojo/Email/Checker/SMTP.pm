@@ -62,7 +62,7 @@ use Mojo::IOLoop::Delay;
 use Mojo::IOLoop::Client;
 use Mojo::IOLoop::Stream;
 
-our $VERSION = "0.03";
+our $VERSION = "0.04";
 use constant CRLF => "\015\012";
 
 sub new {
