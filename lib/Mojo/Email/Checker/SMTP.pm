@@ -255,14 +255,14 @@ sub check {
 			my ($delay, $stream, $buf, $err) = @_;
 			$self->_check_errors($err, $buf);
 			$self->_readhooks($stream, $delay->begin(0));
-			$stream->write("MAIL FROM: <>" . CRLF);
+			$stream->write("MAIL FROM:<>" . CRLF);
 		},
 		sub {
 			my ($delay, $stream, $buf, $err) = @_;
 			$self->_check_errors($err, $buf);
 			$self->_readhooks($stream, $delay->begin(0));
 			my $idn_email = $self->_puny_encode_email($email);
-			$stream->write("RCPT TO: <$idn_email>" . CRLF);
+			$stream->write("RCPT TO:<$idn_email>" . CRLF);
 		},
 		sub {
 			my ($delay, $stream, $buf, $err) = @_;
